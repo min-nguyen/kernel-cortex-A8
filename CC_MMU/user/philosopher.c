@@ -1,5 +1,8 @@
 #include "philosopher.h"
 
+extern void main_P3();
+extern void main_P4();
+extern void main_P5();
 
 void main_philosopher() {
   pid_t forkpid;
@@ -9,7 +12,7 @@ void main_philosopher() {
     if(forkpid > 0)
       write( STDOUT_FILENO, " ", 1);
     if( 0 == forkpid ) {
-      break;
+      exec(&main_P3);
     }
   }
 

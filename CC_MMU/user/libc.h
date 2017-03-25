@@ -33,6 +33,7 @@ typedef int pid_t;
 #define SYS_SEND      ( 0x07 )
 #define SYS_RECEIVE   ( 0x08 )
 #define SYS_MEMALLOC  ( 0x09 )
+#define SYS_FORK_PRTY ( 0x0A )
 #define SIG_TERM      ( 0x00 )
 #define SIG_QUIT      ( 0x01 )
 
@@ -58,6 +59,7 @@ extern int  read( int fd,       void* x, size_t n );
 
 // perform fork, returning 0 iff. child or > 0 iff. parent process
 extern int  fork();
+extern int  fork_priority(int p);
 // perform exit, i.e., terminate process with status x
 extern void exit(       int   x );
 // perform exec, i.e., start executing program at address x

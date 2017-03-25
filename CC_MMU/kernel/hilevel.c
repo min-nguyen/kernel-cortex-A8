@@ -2,11 +2,6 @@
 #include "P3.h"
 
 extern void     main_console();
-extern uint32_t tos_Console;
-
-uint32_t* page_0x701 = ( uint32_t* )( 0x70110000 );
-uint32_t* page_0x702 = ( uint32_t* )( 0x70210000 );
-uint32_t* page_0x703 = ( uint32_t* )( 0x70310000 );
 
 bool pageframe[4096];
 pcb_t pcb[PCB_SIZE], *current = NULL;
@@ -21,8 +16,6 @@ int nextFreePCB(int startPCB){
   }
   return freePCB;
 }
-
-
 
 int nextActivePCB(int startPCB){
   int activePCB = startPCB + 1;
@@ -43,57 +36,10 @@ void hilevel_write(char* x, int n){
 
 void scheduler( ctx_t* ctx ) {
 
-  // switch(currentPCB){
-  //   case 1:
-  //     hilevel_write("pcb(1) ", 7);
-  //     break;
-  //   case 2:
-  //     hilevel_write("pid(2) ", 7);
-  //     break;
-  //   case 3:
-  //     hilevel_write("pid(3) ", 7);
-  //     break;
-    // case 5:
-    //   hilevel_write("pid(5) ", 7);
-    //   break;
-    // case 6:
-    //   hilevel_write("pid(6) ", 7);
-    //   break;
-    // case 7:
-    //   hilevel_write("pid(7) ", 7);
-    //   break;
-    // case 8:
-    //   hilevel_write("pid(8) ", 7);
-    //   break;
-    // case 9:
-    //   hilevel_write("pid(9) ", 7);
-    //   break;
-    // case 10:
-    //   hilevel_write("pid(10) ", 8);
-    //   break;
-    // case 11:
-    //   hilevel_write("pid(11) ", 8);
-    //   break;
-    // case 12:
-    //   hilevel_write("pid(12) ", 8);
-    //   break;
-    // case 13:
-    //   hilevel_write("pid(13) ", 8);
-    //   break;
-    // case 14:
-    //   hilevel_write("pid(14) ", 8);
-    //   break;
-    // case 15:
-    //   hilevel_write("pid(15) ", 8);
-    //   break;
-    // case 16:
-    //   hilevel_write("pid(16) ", 8);
-    //   break;
-  //}
+  pcb[currentPCB].timer -= 1 * (threads+10/10);
 
-  pcb[currentPCB].timer--;
   if(pcb[currentPCB].timer <= 0){
-    pcb[currentPCB].timer = pcb[currentPCB].priority;
+    pcb[currentPCB].timer += pcb[currentPCB].priority;
     if(threads > 1){
          int lastPCB = currentPCB;
          int nextPCB = nextActivePCB(currentPCB);
@@ -114,8 +60,6 @@ void scheduler( ctx_t* ctx ) {
 }
 
 void exitCurrentPID(ctx_t* ctx ){
-
-
   pageframe[pcb[currentPCB].T[0x704] >> 20] = false;
   pageframe[pcb[currentPCB].T[0x705] >> 20] = false;
   pcb[currentPCB].active = false;
@@ -123,7 +67,6 @@ void exitCurrentPID(ctx_t* ctx ){
   pcb[currentPCB].timer = 0;
   threads--;
   scheduler(ctx);
-
 }
 
 void exitPID(ctx_t* ctx, int pid){
@@ -185,16 +128,9 @@ void hilevel_receive(int pid, ctx_t* ctx){
   //Requested value not loaded, deschedule current process
   pcb[currentPCB].waiting = true;
   ctx->gpr[0] = (int) NULL;
-
   scheduler(ctx);
-
 }
 
-//We cannot reference physical memory at all. All addresses specified are virtual and are taken care of. Page table only contains *extra* data to take care of access protection.
-// T[ i ] |= 0xC00;  //E[AP] -> Set no access protection for all
-//
-//4096 pages
-//1 physical page is 1 MiB/1048576 Bytes in size so T[n] 0x70310000 - T[n-1] 0x70210000 = 1MiB,
 //Given T[pagenumber]
 //pagenumber bits 1-0,
 //        10 to specify entry type as page table
@@ -240,7 +176,7 @@ void fork_setup_pagetable(int pcb_num){
     }
 }
 
-void hilevel_fork(ctx_t* ctx){
+int hilevel_fork(ctx_t* ctx){
   int freePCB = nextFreePCB(0);
   memset(&pcb[freePCB], 0, sizeof(pcb_t));
   memcpy(&pcb[freePCB].ctx, ctx, sizeof(ctx_t));
@@ -255,6 +191,7 @@ void hilevel_fork(ctx_t* ctx){
   ctx->gpr[0] = pcb[freePCB].pid;
   threads++;
   hilevel_write("fork ",5);
+  return freePCB;
 }
 
 
@@ -315,7 +252,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   mmu_enable();
   int_enable_irq();
 
-  hilevel_write("MMU Enabled", 11);
+  hilevel_write("MMU Enabled\n", 13);
 
   return;
 }
@@ -335,18 +272,21 @@ void hilevel_handler_irq(ctx_t* ctx       ) {
 }
 
 void hilevel_handler_pab(ctx_t* ctx) {
-  hilevel_write("PAB",3);
+  hilevel_write("\nPre-fetch abort\n",19);
   exitCurrentPID(ctx);
   return;
 }
 
 void hilevel_handler_dab(ctx_t* ctx) {
-  hilevel_write("DAB",3);
+  hilevel_write("\nData abort\n",13);
   exitCurrentPID(ctx);
   return;
 }
 
 void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
+
+  if(id != 0x00)
+    pcb[currentPCB].timer--;
 
   switch( id ) {
     case 0x00 : { // 0x00 => yield()
@@ -369,7 +309,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       break;
     }
     case 0x04 : { //0x04 => exit()
-      //int exitPID = ctx->gpr[0]; don't need
       exitCurrentPID(ctx);
       break;
     }
@@ -393,7 +332,12 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       hilevel_receive(reqPID, ctx);
       break;
     }
-
+    case 0x0A : {
+      int priority = ctx->gpr[0];
+      int forked_pcb = hilevel_fork(ctx);
+      pcb[forked_pcb].priority = priority;
+      break;
+    }
     default   : { // 0x?? => unknown/unsupported
       break;
     }

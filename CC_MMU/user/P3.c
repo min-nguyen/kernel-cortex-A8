@@ -15,6 +15,9 @@ int is_prime( uint32_t x ) {
 }
 
 void main_P3() {
+  int pid = fork_priority(3);
+  if(pid == 0)
+    write( STDOUT_FILENO, "new", 3 );
   for( int i = 0; i < 25; i++ ) {
     write( STDOUT_FILENO, "P3", 2 );
 

@@ -95,6 +95,17 @@ int fork() {
   return r;
 }
 
+int fork_priority(int p){
+  int r;
+  asm volatile( "mov r0, %2 \n"
+                "svc %1     \n" // make system call SYS_FORK
+                "mov %0, r0 \n" // assign r  = r0
+              : "=r" (r)
+              : "I" (SYS_FORK_PRTY), "r" (p)
+              : "r0" );
+  return r;
+}
+
 void exit( int x ) {
   asm volatile( "mov r0, %1 \n" // assign r0 =  x
                 "svc %0     \n" // make system call SYS_EXIT
